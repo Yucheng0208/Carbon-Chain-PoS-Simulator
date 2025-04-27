@@ -5,11 +5,29 @@
     <title>Carbon Chain PoS Simulator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
+    <style>
+        #loader {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            z-index: 1000;
+        }
+    </style>
 </head>
 <body class="bg-light">
 
-<div class="container my-4">
+<!-- 啟動畫面 -->
+<div id="loader">
+    <h1 class="display-4">
+        🌱 Carbon Chain 啟動中...
+    </h1>
+</div>
+
+<!-- 主內容 -->
+<div id="content" class="container my-4" style="display: none;">
     <h1 class="text-center mb-4">🌱 Carbon Chain PoS Simulator</h1>
 
     <div class="card p-4 mb-4">
@@ -67,21 +85,43 @@
     </div>
 </div>
 
+<!-- Modal 彈窗 -->
+<div class="modal fade" id="walletModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">交易與挖礦紀錄</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <h5>交易紀錄：</h5>
+        <ul id="transactionHistory" class="list-group mb-3"></ul>
+        <h5>挖礦紀錄：</h5>
+        <ul id="minedHistory" class="list-group"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+
 async function refresh() {
     const wallets = await fetch('/api/wallets').then(res => res.json());
     const chain = await fetch('/api/chain').then(res => res.json());
 
     const walletsList = document.getElementById('walletsList');
     walletsList.innerHTML = '';
-    for (const [name, info] of Object.entries(wallets)) {
-        walletsList.innerHTML += `<li class="list-group-item">${name} - Balance: ${info.balance}, Stake: ${info.stake}</li>`;
+    for (const name in wallets) {
+        walletsList.innerHTML += `<li class="list-group-item">
+            <a href="#" onclick="viewWallet('${name}')">${name}</a> - Balance: ${wallets[name].balance}, Stake: ${wallets[name].stake}
+        </li>`;
     }
 
     const chainList = document.getElementById('chainList');
     chainList.innerHTML = '';
     for (const block of chain) {
-        chainList.innerHTML += `<li class="list-group-item">#${block.index} by ${block.validator}</li>`;
+        chainList.innerHTML += `<li class="list-group-item">#${block.index} by ${block.validator} (${block.hash.substring(0, 8)}...)</li>`;
     }
 }
 
@@ -107,8 +147,46 @@ async function toggleAutoMine() {
     await fetch('/api/auto_mine', {method: 'POST'});
 }
 
-setInterval(refresh, 5000); // 每5秒刷新
+async function viewWallet(name) {
+    const txs = await fetch(`/api/wallet/${name}/transactions`).then(res => res.json());
+    const mined = await fetch(`/api/wallet/${name}/mined_blocks`).then(res => res.json());
+
+    const transactionHistory = document.getElementById('transactionHistory');
+    transactionHistory.innerHTML = '';
+    for (const tx of txs) {
+        transactionHistory.innerHTML += `<li class="list-group-item">
+            ${tx.sender} ➔ ${tx.receiver} : ${tx.amount}CC <br> Hash: ${tx.hash.substring(0,12)}...
+        </li>`;
+    }
+
+    const minedHistory = document.getElementById('minedHistory');
+    minedHistory.innerHTML = '';
+    for (const block of mined) {
+        minedHistory.innerHTML += `<li class="list-group-item">Mined Block #${block}</li>`;
+    }
+
+    const walletModal = new bootstrap.Modal(document.getElementById('walletModal'));
+    walletModal.show();
+}
+
+// 啟動畫面控制
+window.onload = function() {
+    setTimeout(() => {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+    }, 3000);
+
+    setTimeout(() => { 
+        if (document.getElementById('loader').style.display !== 'none') {
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+        }
+    }, 5000); // fallback 安全機制
+};
+
+setInterval(refresh, 5000);
 refresh();
+
 </script>
 
 </body>
