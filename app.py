@@ -29,7 +29,6 @@ def create_transaction():
     sender = data['sender']
     receiver = data['receiver']
     amount = int(data['amount'])
-
     try:
         blockchain.add_transaction(sender, receiver, amount)
         return jsonify({'message': 'Transaction added.'}), 201
@@ -51,7 +50,7 @@ def full_chain():
         chain_data.append({
             'index': block.index,
             'timestamp': block.timestamp,
-            'data': block.data,
+            'transactions': [{'sender': tx.sender, 'receiver': tx.receiver, 'amount': tx.amount, 'hash': tx.hash} for tx in block.transactions],
             'previous_hash': block.previous_hash,
             'validator': block.validator,
             'hash': block.hash
@@ -63,6 +62,25 @@ def toggle_auto_mine():
     global auto_mining
     auto_mining = not auto_mining
     return jsonify({'auto_mining': auto_mining})
+
+@app.route('/api/wallet/<wallet_name>/transactions', methods=['GET'])
+def get_wallet_transactions(wallet_name):
+    if wallet_name not in wallets:
+        return jsonify({'error': 'Wallet not found'}), 404
+    transactions = [{
+        'sender': tx.sender,
+        'receiver': tx.receiver,
+        'amount': tx.amount,
+        'hash': tx.hash,
+        'timestamp': tx.timestamp
+    } for tx in wallets[wallet_name].transactions]
+    return jsonify(transactions)
+
+@app.route('/api/wallet/<wallet_name>/mined_blocks', methods=['GET'])
+def get_wallet_mined_blocks(wallet_name):
+    if wallet_name not in wallets:
+        return jsonify({'error': 'Wallet not found'}), 404
+    return jsonify(wallets[wallet_name].mined_blocks)
 
 def auto_mine_thread():
     global auto_mining
